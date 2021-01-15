@@ -1,1 +1,16 @@
-# quantitative_text_analysis
+# Quantitative Analysis of Political Texts {#qta}
+
+
+This chapter is divided into three sections, which employ different strategies to analyze textual data from Twitter. Subsection \@ref(sqta1) covers text analysis exploration, Subsection \@ref(sqta2) deals with Wordfish (a technique to position texts along an axis), while Subsection \@ref(sqta3) covers structural topic models (STM), which helps us discover underlying themes in text data.
+
+In the study of contentious politics, #olafeminista, #metoo, #blacklivesmatter and #niunamenos are hashtags that went viral and tell a rich story of the social media activism and protest. We will use as a case study a protest cycle called Ola Feminista (Feminist Wave), which occurred in Chile from May to June of 2018. The feminist protest cycle denounced structural gender inequalities and started as a mobilization of students in Santiago, and gradually grew expanding to broader demands from feminist and worker organizations across Chile.^[For a deeper understanding on the extent of this movement, we recommend the book edited by journalist Faride Zerán, "Mayo Feminista: La rebelión contra el patriarcado" [-@zeranMayoFeministaRebelion2018].] 
+
+In the first half of this chapter, you will learn how to use basic descriptive statistics to understand how policy makers use Twitter. We will analyze how deputies in Chile made use of gender related hashtags during the #olafeminista (feminist wave). We will analize simple frequency variations in the usage of hashtags to adrresss different levels of engagement with the online debate around gender and feminist issues.  
+
+In the second half or the chapter, you will learn how to use Wordfish and Structural Topic Modeling (STM), two recent natural language processing (NLP) techniques used in political science for unsupervised text mining. While Wordfish will let us position the political coalitions along a left-right ideological axis, the STM will let us indentify the most regular topics --or groups of words-- and see how these topics are correlated to a variable of interest. In our example we will explore the correlation between the gender of the deputy and the use of certain hashtags. All in all, these techniques are a great tool to gain knowledge on how coalitions and policy makers are digitally engaged in a political conversation. 
+
+In this chapter, you will use an original dataset with identification variables for the deputies, such as name and last name, district, political party, age, among others.  The identification variables were extracted from the [official web page of the House of Representatives (*Cámara de Diputados*)](https://www.camara.cl/camara/deputys.aspx#tab). For the data extraction from Twitter we used the `rtweet` package, which allows us to freely access Twitter’s API for downloading information by users, dates and hashtags (see Chapter \@ref(web-mining)).
+
+In this type of analysis, the most difficult task is gathering and cleaning the dataset to make it look "tidy". Fortunately, Twitter’s API and packages such as `rtweet` or `twitter` are very helpful in managing the downloaded information in a simple and orderly way.^[To learn more about some great research strategies in social sciences using Twitter data we recommend the chapter "Observing Behavior" of the book "Bit by Bit" by Matthew Salganik [-@salganikBitBitSocial2017, ch. 2].] 
+
+## Analysis of political hashtags {#sqta1}
