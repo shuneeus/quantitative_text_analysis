@@ -1,0 +1,812 @@
+# Quantitative Analysis of Political Texts {#qta}
+
+*Sebastián Huneeus*^[Institute of Political Science, Pontificia Universidad Católica de Chile. E-mail: lshuneeus\@uc.cl.]
+
+
+### Suggested readings  {-}
+
+- Salganik, M. J. (2017). *Bit by Bit: Social Research in the Digital Age.* Princeton University Press, Princeton, NJ.
+
+- Silge, J. and Robinson, D. (2017). *Text Mining with R: A Tidy Approach.* O’Reilly, Sebastopol, CA.
+
+- Steinert-Threlkeld, Z. C. (2018). *Twitter as Data.* Cambridge University Press, Cambridge.
+
+### Packages you need to install {-}
+
+- `tidyverse` [@R-tidyverse], `politicalds` [@R-politicalds], `lubridate` [@R-lubridate], `skimr` [@R-skimr], `ggwordcloud` [@R-ggwordcloud], `tidytext` [@R-tidytext], `stopwords` [@R-stopwords], `quanteda` [@R-quanteda], `quanteda.textmodels` [@R-quanteda.textmodels], `qdapRegex` [@R-qdapRegex], `stm` [@R-stm], `tidystm` [@R-tidystm], `remotes` [@R-remotes]. 
+
+This chapter is divided into three sections, which employ different strategies to analyze textual data from Twitter. Subsection \@ref(sqta1) covers text analysis exploration, Subsection \@ref(sqta2) deals with Wordfish (a technique to position texts along an axis), while Subsection \@ref(sqta3) covers structural topic models (STM), which helps us discover underlying themes in text data.
+
+In the study of contentious politics, #olafeminista, #metoo, #blacklivesmatter and #niunamenos are hashtags that went viral and tell a rich story of the social media activism and protest. We will use as a case study a protest cycle called Ola Feminista (Feminist Wave), which occurred in Chile from May to June of 2018. The feminist protest cycle denounced structural gender inequalities and started as a mobilization of students in Santiago, and gradually grew expanding to broader demands from feminist and worker organizations across Chile.^[For a deeper understanding on the extent of this movement, we recommend the book edited by journalist Faride Zerán, "Mayo Feminista: La rebelión contra el patriarcado" [-@zeranMayoFeministaRebelion2018].] 
+
+In the first half of this chapter, you will learn how to use basic descriptive statistics to understand how policy makers use Twitter. We will analyze how deputies in Chile made use of gender related hashtags during the #olafeminista (feminist wave). We will analize simple frequency variations in the usage of hashtags to adrresss different levels of engagement with the online debate around gender and feminist issues.  
+
+In the second half or the chapter, you will learn how to use Wordfish and Structural Topic Modeling (STM), two recent natural language processing (NLP) techniques used in political science for unsupervised text mining. While Wordfish will let us position the political coalitions along a left-right ideological axis, the STM will let us indentify the most regular topics --or groups of words-- and see how these topics are correlated to a variable of interest. In our example we will explore the correlation between the gender of the deputy and the use of certain hashtags. All in all, these techniques are a great tool to gain knowledge on how coalitions and policy makers are digitally engaged in a political conversation. 
+
+In this chapter, you will use an original dataset with identification variables for the deputies, such as name and last name, district, political party, age, among others.  The identification variables were extracted from the [official web page of the House of Representatives (*Cámara de Diputados*)](https://www.camara.cl/camara/deputys.aspx#tab). For the data extraction from Twitter we used the `rtweet` package, which allows us to freely access Twitter’s API for downloading information by users, dates and hashtags (see Chapter \@ref(web-mining)).
+
+In this type of analysis, the most difficult task is gathering and cleaning the dataset to make it look "tidy". Fortunately, Twitter’s API and packages such as `rtweet` or `twitter` are very helpful in managing the downloaded information in a simple and orderly way.^[To learn more about some great research strategies in social sciences using Twitter data we recommend the chapter "Observing Behavior" of the book "Bit by Bit" by Matthew Salganik [-@salganikBitBitSocial2017, ch. 2].] 
+
+## Analysis of political hashtags {#sqta1}
+
+\index{quantitative text analysis!descriptive analysis}
+
+What are hashtags (#) and how are they related to politics? Hashtags are texts that connect users in a digital conversation. Analyzing them helps us to understand how, when and by whom these conversations are taking place. Also, hashtags could help political movilization. Indeed, there is literature that addresses social protest through the viralization of hashtags, like the recent works that study the hashtag-feminism [@trottConnectedFeministsForegrounding2018] and hashtags of racial minority activism, such as #blacklivesmatter [@inceSocialMediaResponse2017].^[An essential read about how a Latin-American political crisis can be studied through Twitter is *Political Anatomy of Twitter in Argentina* (Anatomía Política de Twitter en Argentina) [-@calvoAnatomiaPoliticaTwitter2015] on the structure of the digital network generated after the death of prosecutor Alberto Nisman in 2015.] 
+
+In general, using a hashtag indicates interest in a topic, independently of one being in favor or against it. Therefore, this first exercise is not intended to measure levels of support, but instead, this analysis allows us to identify those representatives discussing gender issues. The organization of the section is as follows. The first part is the exploration of the dataset and a bivariate descriptive analysis of the `#` frequencies. In the second part, we make a comparison by gender.  Thirdly, we compare the use of hashtags by political coalition. In the fourth part, we will see the weekly variation in the use of some `#`. In the fifth section, this temporal variation will be separated by gender.
+
+
+### Twitter data exploration
+
+```{r, message=F}
+library(tidyverse)
+library(tidytext)
+```
+
+```{r}
+library(politicalds)
+data("poltweets")
+```
+
+After loading the dataset `poltweets`, we explore it with `skimr::skim(poltweets)`, as shown in Figure \@ref(fig:skim-qta). With this function you can do a quick exploration of the size of the dataset, the number of observations and variables, and the type of variables (character, integer, factor, etc). We can also look at the number of missing values, the number of categories or values that the factor variable assumes (`n_unique`), as well as the dispersion statistics for quantitative variables (min, max, quantiles, mean and standard deviation). `skimr::skim()` is a good first step that will allow us to diagnose the data we will work with. In the case of our dataset `poltweets`, we see that there are 7 variables of the "character" type and one of the "POSIXct" type, which also helps working with dates.
+
+```{r skim-qta, fig.align='center',echo=FALSE, out.width='100%', fig.cap="Skim of our dataset."}
+knitr::include_graphics("00-images/qta/skim_qta.pdf")
+```
+
+Look how 75.4% of the rows in the dataset correspond to tweets by congressmen. We also notice thata there are are 29 congresswomen and 93 congressmen in the dataset. 
+
+```{r}
+# among tweets:
+poltweets %>% count(gender) %>% mutate(freq = n / sum(n))
+
+# deputies' characteristics:
+poltweets %>% 
+    distinct(screen_name, gender)%>% 
+    count(gender) 
+```
+
+After we loaded the dataset and took a quick view to the size and variables included, we must extract the hashtags from the tweets using the `unnest_tokens()` function of `tidytext`, creating a tokenized data frame with one row per hashtag. We then just filter all the rows starting with a hashtag (#), leaving us with a one-hashtag-per-row data frame.
+
+```{r}
+poltweets_hashtags <- poltweets %>% 
+  unnest_tokens(output = "hashtag", input = "text", token = "tweets") %>%
+  filter(str_starts(hashtag, "#"))
+```
+
+We want to see the differences in how representatives, parties and coalitions engage in the gender political debate. To do so, we create a new dummy variable that takes value "1" each time the character string variable matches any of the regular expresions like "femi", "niunamenos", "aborto", "mujer" and "genero":
+```{r}
+poltweets_hashtags <- poltweets_hashtags %>%
+  mutate(fem_hashtag = case_when(str_detect(hashtag, "femi") ~ 1, 
+                                 str_detect(hashtag, "niunamenos") ~ 1, 
+                                 str_detect(hashtag, "aborto") ~ 1,
+                                 str_detect(hashtag, "mujer") ~ 1,
+                                 str_detect(hashtag, "genero")~ 1,
+                                 TRUE ~ 0)) %>% 
+  mutate(fem_hashtag = as.character(fem_hashtag))
+```
+
+We see that this is a good measure for capturing gender and feminist related hashtags. Notice that only 4.1% of the rows contain a hashtag related to gender under this criteria and that the three most frequent hashtags are #aborto3causales, #interpelacionaborto3causales and #leydeidentidaddegeneroahora.^[The hashtag `#aborto3causales` (#abortionunder3causes) is related to a long-standing national debate: Between 1989 and 2017 Chile had one of the most restrictive abortion policies in the world, criminalizing its practice without exception. Since 2017, abortion in Chile is legal in the following cases: when the mother's life is at risk, when the fetus will not survive the pregnancy, and during the first 12 weeks of pregnancy (14 weeks if the woman is under 14 years old) in the case of rape. On February 12th, 2018, the Technical Norm was promulgated on the Official Journal of the 21.030 Law, which decriminalized abortion for the three causes. The norm was threatened with repeal and modification, which generated a substantial amount of controversy.] 
+
+```{r}
+poltweets_hashtags %>% count(fem_hashtag) %>% mutate(freq = n / sum(n))
+```
+
+```{r}
+poltweets_hashtags %>% 
+  filter(fem_hashtag == "1") %>% 
+  count(hashtag) %>% 
+  arrange(-n) 
+```
+
+### Visual diagnosis 
+
+Let's make some bivariate analysis by grouping by the number of tweets per month, coalition and gender (Figures \@ref(fig:qta1), \@ref(fig:qta2), and \@ref(fig:qta4)). 
+
+```{r qta1, fig.cap= "Total number of tweets by month.", echo=F}
+library(lubridate)
+
+poltweets_hashtags %>% 
+  mutate(by_month = floor_date(as_date(created_at), 
+                               unit = "month", week_start = 1)) %>% 
+  ggplot(aes(x = by_month)) + 
+  geom_bar() + 
+  labs(title = "",
+       x = "Month", y = "Number of tweets") +
+  scale_x_date(breaks = scales::date_breaks("months"), 
+               labels = scales::date_format("%b %y")) + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r qta2, fig.cap= "Total number of tweets by coalition.", echo=F}
+poltweets_hashtags %>% 
+  count(coalition) %>% 
+  ggplot(aes(x = fct_reorder(coalition, -n), y = n)) + 
+  geom_col() +
+  labs(title = "",
+       x = "Coalition", y = "Number of tweets")
+```
+
+```{r qta4, fig.cap= "Total number of tweets by gender.", echo=F}
+poltweets_hashtags %>%
+  count(gender) %>% 
+  ggplot(aes(x = fct_reorder(gender, -n), y = n)) + 
+  geom_col() +
+  labs(title = "",
+       x = "Gender", y = "Number of tweets") + 
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+### Most-used hashtags 
+
+To see which are the most frenquently used hashtags, we order them from the most to the least frequent. We see that the most used hashtag is `#cuentapublica` (#stateoftheunion), linked to the Public Account Speech of May 21st delivered by President Sebastian Piñera to the National Congress. The hashtag `#aborto3causales` (#abortionunder3causes) is the only gender related hashtag in the ranking, with 98 mentions. This hashtag refers to the discussion about the abortion law. Since 2017, abortion in Chile is legal in the following cases: when the mother's life is at risk, when the fetus will not survive the pregnancy, and during the first 12 weeks of pregnancy (14 weeks if the woman is under 14 years old) in the case of rape. On February 12th, 2018, the Technical Norm was promulgated on the Official Journal of the 21.030 Law, which decriminalized abortion for these three causes. The norm was threatened with repeal and modification, which generated a substantial amount of controversy. 
+
+```{r include=F}
+options(max.print = 500)
+```
+
+```{r}
+poltweets_hashtags %>% 
+  count(hashtag, fem_hashtag) %>% 
+  arrange(-n) %>% 
+  slice(1:20)
+```
+
+```{r include=F}
+options(max.print = 8)
+```
+
+
+
+### Wordclouds 
+
+A quick and intuitive way of representing word frequencies are wordclouds. These graphical representations allow to place at the center and with large letters the cases that have greater frequencies. For that, we use the `ggwordcloud` package for the 35 most common hashtags. After creating a counting dataset, we'll employ the `geom_text_wordcloud()` with the "label" and "size" and "color" aesthetic mappings. In the visual inspection we see the three most used gender hashtags: #aborto3causales, #leydeidentidaddegeneroahora and #interpelacionaborto3causales (Figure \@ref(fig:qta5)). 
+
+```{r}
+library(ggwordcloud)
+
+data_hashtags_wordcloud <- poltweets_hashtags %>% 
+  count(hashtag, fem_hashtag) %>% 
+  arrange(-n) %>% 
+  slice(1:35)
+```
+
+
+```{r eval=F}
+ggplot(data_hashtags_wordcloud, 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 8) + # we set a maximum size for the text 
+  theme_void()
+```
+
+```{r qta5, warning=F, fig.cap= "Wordcloud of the most common hashtags.", echo=F, fig.width=6}
+set.seed(1); ggplot(
+  data_hashtags_wordcloud %>% 
+    mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                             "#diputadohugorey",
+                             hashtag)), 
+  aes(label = hashtag, size = n,
+      color = fem_hashtag)) + 
+  geom_text_wordcloud(family = "Latin Modern Roman") +
+  scale_color_manual(values = c("darkgrey", "black")) +
+  scale_size_area(max_size = 8) + # we set a maximum size for the text 
+  theme_void()
+```
+
+
+### Wordclouds by groups
+
+Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as #olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition Chile Vamos (ChV) uses no hashtag at all (see Figures \@ref(fig:qta6) and \@ref(fig:qta7)). 
+
+```{r eval=F}
+ggplot(poltweets_hashtags %>% 
+         count(hashtag, gender, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(gender) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 6) + 
+  facet_wrap(~gender)
+```
+
+```{r qta6, warning=F, echo=F, fig.cap= "Wordclouds by gender.", fig.width = 6}
+ggplot(poltweets_hashtags %>% 
+         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                                  "#diputadohugorey",
+                                  hashtag)) %>% 
+         count(hashtag, gender, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(gender) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 6) +
+  scale_color_manual(values = c("darkgrey", "black")) +
+  facet_wrap(~gender)
+```
+
+```{r eval=F}
+ggplot(poltweets_hashtags %>% 
+         count(hashtag, coalition, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(coalition) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 6) + 
+  facet_wrap(~coalition, nrow = 3)
+```
+
+```{r qta7, warning=F, echo=F, fig.cap= "Wordclouds by coalition.", fig.width = 5, fig.height=5}
+ggplot(poltweets_hashtags %>%
+         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                                  "#diputadohugorey",
+                                  hashtag)) %>% 
+         count(hashtag, coalition, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(coalition) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_color_manual(values = c("darkgrey", "black")) +
+  scale_size_area(max_size = 6) + 
+  facet_wrap(~coalition, nrow = 3)
+```
+
+### Barplots
+
+Now we will rank the frequency of hashtags by gender. We will generate this graph in two steps, first we create a table with the 15 most used hashtags among women and men. Then, we will create a bar chart by adding the `geom_col()` argument to the `ggplot()` function. As a result, we see the hashtag #aborto3causales (#abortionunder3causes) and #leydeidentidaddegeneroahora (#genderidentitylawnow) appear only  congresswomen accounts, whereas none of these gender related hashtags appear in masculine accounts (Figure \@ref(fig:qta8)). 
+
+```{r}
+plot_15 <- poltweets_hashtags %>%
+  group_by(gender) %>% 
+  count(hashtag, fem_hashtag) %>% 
+  arrange(-n) %>% 
+  slice(1:15)
+```
+
+```{r eval=F}
+ggplot(data    = plot_15,
+       mapping = aes(x = n, y = reorder_within(hashtag, n, gender), 
+                     fill = fem_hashtag)) +
+  geom_col()+
+  labs(x = "Frequency", y = "", fill = "Feminist hashtag") +
+  facet_wrap(~gender, scales = "free", nrow = 2) +
+  scale_y_reordered()
+```
+
+```{r qta8, warning=F, echo=F, fig.align='left', fig.height=7, fig.cap="Most frequent hashtags by congresswomen (April 1 - June 30)."}
+ggplot(data    = plot_15,
+       mapping = aes(x = n, y = reorder_within(hashtag, n, gender), 
+                     fill = fem_hashtag)) +
+  geom_col()+
+  labs(x = "Frequency", y = "", fill = "Feminist hashtag") +
+  scale_fill_manual(values = c("darkgrey", "black")) +
+  facet_wrap(~gender, scales = "free", nrow = 2) +
+  scale_y_reordered()
+```
+
+Now we calculate and plot the statistic tf-idf, intended to measure how important a word is to a document in a collection of documents. This statistic is a combination of term frequency (tf) and the term’s inverse document frequency (idf), which decreases the weight for commonly used words and increases the weight for words that are not used very much in the entire collection of documents. We see that, when separating by groups, two hashtags with the highest statistic tf-idf in the Frente Amplio are gender related (#leydeidentidaddegeneroahora). 
+
+```{r}
+hash_tf_idf <- poltweets_hashtags %>%
+  # calculate tf-idf:
+  count(coalition, hashtag, fem_hashtag, sort = T) %>% 
+  bind_tf_idf(term = hashtag, document = coalition, n = n) %>% 
+  # get 10 most distinctive hashtags per coalition:
+  arrange(-tf_idf) %>% 
+  group_by(coalition) %>% 
+  slice(1:10)
+```
+
+```{r eval=F}
+ggplot(data    = hash_tf_idf,
+       mapping = aes(x = tf_idf,
+                     y = reorder_within(hashtag, tf_idf, coalition), 
+                     fill = fem_hashtag)) +
+  geom_col() +
+  labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
+  facet_wrap(~coalition, nrow = 3, scales = "free") +
+  scale_y_reordered()
+```
+
+```{r tf, echo=F, fig.cap="tf-idf statistic, intended to measure how important a word is to a document.", fig.height=7, fig.width=6}
+ggplot(data    = hash_tf_idf %>% 
+         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                                  "#diputadohugorey",
+                                  hashtag)),
+       mapping = aes(x = tf_idf,
+                     y = reorder_within(hashtag, tf_idf, coalition), 
+                     fill = fem_hashtag)) +
+  geom_col() +
+  labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
+  scale_fill_manual(values = c("darkgrey", "black")) +
+  facet_wrap(~coalition, nrow = 3, scales = "free") +
+  scale_y_reordered()
+```
+
+### Temporal variation in the use of hashtags
+
+Certain hashtags may increase or decrease in its use through time, depending on the political context. We will explore the weekly frequency of two most frequent hashtags in our example. Using the `lubridate` package, which works with data in a date format, we can look for time trends. In our dataset we have one variables with a date: `created_at`. Using this variable, we can confirm there was a peak in tweets between the 27th of May and the 2nd of June (see Figure \@ref(fig:qta9)). 
+
+```{r qta9, fig.cap= "Temporal variation in the usage of hashtags."}
+hashtags_weekly <- poltweets_hashtags %>% 
+  mutate(week = floor_date(created_at, "week", week_start = 1)) %>% 
+  filter(hashtag %in% c("#aborto3causales", 
+                        "#leydeidentidaddegeneroahora")) %>% 
+  count(hashtag, week)
+
+ggplot(data    = hashtags_weekly,
+       mapping = aes(x = week, y = n, 
+                     linetype = hashtag, group = hashtag)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Week", y = "Total weekly use", linetype = "Hashtag")
+```
+
+### To sum up
+
+Hashtags can tell you a lot about a political debate. We could verify some evident differences in the use of gender "#". Congresswomen used far more hashtags such as #olafeminista (#feministwave) and #agendamujer (#womenagenda) than their male counterparts. Regarding the coalitions, the left-wing ones (Frente Amplio and La Fuerza de la Mayoría) used them more. Regarding the temporal variation, the greater intensity of mentions on gender issues occurred during the week of the 14-20th of May, the week before the Public Account Speech (21st of May), which also fitted with a manifestation in various cities of the country. We observe that, in relative terms, congresswomen were almost five times more interested in the feminist movement, since they used the hashtag #agendamujer 5 times more than their male counterparts during the week of the 14-20th of May.
+
+What did you learn in this section? We showed you how to use Twitter to analyzing political phenomena. Once you have your own dataset you can follow our step by step analysis. This would be useful as your starting point for explanatory designs that inquire on the causes of political alignment in different agendas.
+
+
+## Wordfish
+
+In this section of the chapter, we will employ two NLP techniques commonly used in political science for unsupervised text mining: Wordfish and Structural Topic Models (STM). Both text processing models allow us to summarize a lot of different documents in a fast and economical way and can complement other descriptive measures like word and hashtags frequencies. As they are unsupervised, the classifications will be done without using any previous coding or dictionary [@welbersTextAnalysis2017]. This has the advantage of saving work on manual coding, as well as avoiding the coder's own bias. Another advantage is that they are not dependent on the source language, i.e. in principle they can be used in any language. Both methods use the "bag of words" approach, since the order of the words within a text does not alter the analysis. The parameters estimated by each algorithm can then be plotted with `ggplot2`, which facilitates the visual interpretation of the results [@silgeTextMiningTidy2017]. 
+
+The organization of the section has the following structure. First, we will do a little data cleaning, like removing stopwords (with a stopword dictionary, in this case, incorporated into Quanteda), strange characters and numbers. Then, we will apply the Wordfish algorithm on the tweets of the Chilean Members of Parliament during the same period as the previous section. In the second part, we will do a topic modeling with STM on the same corpus. 
+
+
+### Inspection and data cleaning 
+
+We load again the `poltweets` dataset and notice now that it contains a set of variables which are necessary for text analysis. Now we will use the entire tweets, not just the tokens. We will also require a variables `status_id` necessary to match each tweet to who tweeted it.  
+
+```{r}
+library(quanteda) # dfm and corpus
+library(quanteda.textmodels) # wordfish
+library(qdapRegex) # remove non ascii characters
+```
+
+Let's always start by doing a quick scan of the data, as we did in the previous section. The descriptive analysis allows us to summarize basic characteristics of the dataset, such as the type of variables and the number of characters per observation, the amount of missing data and the range of text units contained in each variable. We explore the character variable that contains the tweets. By using the `glimpse()` command we have a preview of each variable, specifically of its type and a preview of the first observations. 
+
+```{r}
+glimpse(poltweets)
+```
+
+
+### Preprocessing
+
+Before applying the algorithm, we must pre-process the texts. This means using regular expressions to make the text cleaner. We will use regular expressions to remove strange characters, usernames, URLs, emojis and switch everything to lowercase.
+
+```{r}
+# function to remove accents
+f_remove_accent <- function(x){
+  x %>% 
+    str_replace_all("á", "a") %>% 
+    str_replace_all("é", "e") %>% 
+    str_replace_all("í", "i") %>% 
+    str_replace_all("ó", "o") %>% 
+    str_replace_all("ú", "u") %>% 
+    str_replace_all("ñ", "n") # also replace "ñ", a common letter in Spanish
+}
+
+# now pre-process the dataset:
+poltweets <- poltweets %>% 
+  mutate(text = text %>%
+           # delete user names (which start with @):
+           str_remove("\\@[[:alnum:]]+") %>% 
+           # delete URLs:
+           str_remove_all("http[\\w[:punct:]]+") %>% 
+           # all text to lowercase:
+           str_to_lower() %>%
+           # remove special characters:
+           str_remove_all("[\\d\\.,_\\@]+") %>% 
+           f_remove_accent() %>%
+           # remove emojis
+           rm_non_ascii() 
+         )
+```
+
+Once the text is clean, we want to group it according to the variable for comparison. As we are interested in obtaining the estimates at the coalition level, we group the texts by coalition. Now each coalition is a document in the dataset. When ordering by coalitions, you should place the factor levels in a way that it resembles a left-right axis: 
+
+```{r}
+by_coalition <- poltweets %>% 
+  group_by(coalition) %>% 
+  summarize(text = str_c(text, collapse = " ")) %>%
+  ungroup() %>% 
+  # reorder the variable:
+  mutate(coalition = fct_relevel(as.factor(coalition), "FA", "LFM", "ChV"))
+```
+
+For modeling with Quanteda we transform the dataset first to Corpus format, and then to Document-feature Matrix (DFM) format. This means transforming each documents in rows and "features" as columns. We make the transformation of the dataset grouped by coalitions to Corpus format and then to DFM. In addition, we take advantage of using a command that will help eliminate numbers, punctuations, symbols and stopwords (conjuctions, articles, etc.):
+
+```{r}
+# Corpus format
+poltweets_corpus <- corpus(by_coalition)
+
+# DFM format
+poltweets_dfm <- dfm(poltweets_corpus,
+                     remove_numbers = T, remove_punct = T, 
+                     remove_symbols = T, remove = stopwords("spa"))
+```
+
+Using `dfm_trim()`, we eliminate words with frequency equal to or less than the 5th percentile and those words with a frequency equal or greater than the 95th percentile. In this way, we eliminate unusual words that are located at the extremes of the frequency distribution that can bias the results of the algorithm. 
+
+```{r}
+poltweets_dfm_trimmed <- dfm_trim(
+  poltweets_dfm, 
+  min_docfreq = 0.05, max_docfreq = 0.95, 
+  docfreq_type = "quantile" # min 5% / max 95%
+)
+```
+
+### Wordfish {#sqta2}
+
+\index{quantitative text analysis!Wordfish}
+
+Wordfish is an algorithm that allows one-dimensional scaling of a set of texts [@slapinScalingModelEstimating2008]. That is, to order in a one-dimensional axis the documents from how similar they are to each other in the use of certain keywords. The classification is carried out by establishing the frequency of word use. This modeling assumes that the number of times a word is said in a document follows a Poisson distribution. This model is extremely simple since the number of times a word will appear is estimated from a single parameter λ, which is both the mean and the variance of the Poisson probability distribution. 
+
+The distribution is as follows [@prokschPositionTakingEuropean2010]: 
+  
+$$
+Wordcount_{ij} \sim Poisson(\lambda_{ij})
+$$
+                                 
+where 
+                               
+$$
+\lambda_{ij} = exp(\alpha_i + \psi_j + \beta_j * \omega_i)
+$$
+                                 
+The count of a word $j$ for the document $i$ follows a Poisson distribution with parameter $λ$ for the word $j$ and the document $i$. The model estimates the parameter $\lambda_{ij}$, which is a function of a term $\alpha_i$ which is a fixed effect for documents and the term $\psi_j$ which is a fixed effect for the word $j$ - by entering these fixed effects, the fact that some words may appear more times than others is discounted. The parameter of interest is $\beta_j$, which captures the importance of each word $j$ to discriminate the positions of $i$ on the latent axis $X$. Therefore, documents can be grouped based on how similar they are by using certain keywords. 
+                               
+Wordfish has two fundamental assumptions, first, that words always have the same meaning within the text. Second, the texts are ordered by a latent dimension $X$ which is an axis that articulates the ideological differentiation of the documents [@slapinScalingModelEstimating2008]. However, the validity of this assumption is sustained to the extent that the method is robust with other measurements and that the corpus of texts included in the analysis are representative of the dimension. 
+                               
+In political science, some of the works that have used this algorithm with Twitter is that of Andrea Ceron [-@ceronIntrapartyPolitics1402017] in which he uses the Wordfish estimates to predict the ideological heterogeneity within Italian political parties, to see which legislator will be selected as minister and the probability that they will leave the party [@ceronIntrapartyPolitics1402017].   
+                               
+We apply the Wordfish algorithm to the DFM class object, specific to Quanteda.We define the direction of parameter $\theta$ -the equivalent of $\beta$-, in this case that document 3 (FA) is the positive pole and document 1 (CHV) is the negative pole in the estimated ideological dimension. We also use the argument `sparse = T`, which allows working with large amounts of data, saving computational power.
+                               
+```{r}
+wf <- textmodel_wordfish(poltweets_dfm_trimmed,
+                         dir = c(3, 1), sparse = T)
+```
+
+We plot it in Figure \@ref(fig:qta11):
+                                 
+```{r qta11, fig.align='left', fig.cap="Classification of coalitions by ideological positioning"}
+df_wf <- tibble(
+  # coalition labels:
+  coalition = wf[["x"]]@docvars[["coalition"]],
+  # then we extract thetas and their SEs from the mode object:
+  theta = wf$theta, 
+  lower = wf$theta - 1.96 * wf$se.theta, 
+  upper = wf$theta + 1.96 * wf$se.theta
+)
+
+df_wf
+
+ggplot(data    = df_wf,
+       mapping = aes(x = theta, y = fct_reorder(coalition, theta),
+                     xmin = lower, xmax = upper)) +
+  geom_point() +
+  geom_linerange() +
+  # add vertical line at x=0:
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_x_continuous(limits = c(-1.2, 1.2)) +
+  labs(y = "")
+```
+
+We see that coalitions are grouped along a left-right divide. The interest parameter $\theta$, equivalent to the beta parameter, is the parameter that discriminates the positions of the documents from the word frequencies. We see that this parameter is consistent with how coalitions are grouped politically. The rightmost one, Chile Vamos (ChV), with a $\theta$ of 1.07, is located at one end of the X axis, on the contrary, the leftmost one, Frente Amplio (FA), with a $\theta$ of -0.91, is located at the opposite end. 
+                    
+                      
+\index{exercise!13A. quantitative text analysis}
+
+> **Exercise 13A.** You can repeat the Wordfish, but now invert the direction of the parameter $\theta$ in the `wf` object. How does the distribution of the documents change by inverting the direction of the parameter? Now repeat the exercise  by grouping by political parties.
+
+
+### What did we learn from Wordfish?
+
+Using the same tweets as in the previous section, we saw how teets coming from the members of the congress were consistent with an ideological divison, ordered in a left-right axis. In particular, we conclude that the Frente Amplio and Chile Vamos coalitions are at opposite extremes in regards to their tweets during the Chilean protest cycle. Amazingly, the algorithm is capable of locating the Chilean coalitions in a left-right axis taking as input only the tweets of the parliamentarians during the protest cycles, without any manual labelling of the texts. Wordfish is a powerful tool to be used as a spatial positioning method, adding to the repertoire of other political position measurements such as Bayesian ideal point estimations [@barberaBirdsSameFeather2015], roll call and cosponsorship [@alemanComparingCosponsorshipRollCall2009].
+
+## Structural Topic Modeling {#sqta3}
+
+\index{quantitative text analysis!structural topic modeling}
+
+Topic modeling is a computational method for automatically identifying relevant word groupings in large volumes of texts. One of the most popular applications in political science is the Latent Dirichlet Allocation (LDA), developed by @bleiLatentDirichletAllocation2003 and explained in a didactic way by David Blei at the [Machine Learning Summer School 2009 at Cambridge University](https://www.youtube.com/watch?v=DDq3OVp9dNA).  
+
+Another useful development is the structural topic modeling (STM), a non supervised NLP technique for diving large corpora of texts. The main innovation of the STM is that it incorporates metadata into the topic model, so it allows researchers to discover topics and estimate their relationship to covariates, improving the quality of the inferences and the interpretability of the results. The STM algorithm is available in the `stm` package created by Molly Roberts, Brandon Stewart and Dustin Tingley. For a more detailed review of this method there is a bulk of material in the [official site of the package](http://www.structuraltopicmodel.com/).
+
+In this section, we will analize a subset of our tweets to find the most relevant topics and see how they correlate to the gender and coalition variables. Following [Julia Silge's lead](https://juliasilge.com/blog/evaluating-stm/), we will first do all the preprocessing using tidy tools, to then feed a corrected dataset to `stm`.
+
+### Pre-processing
+
+We will only employ tweets from May 2018:
+
+```{r message=F}
+library(tidyverse)
+library(tidytext)
+library(stm)
+library(quanteda)
+library(qdapRegex)
+```
+
+```{r}
+poltweets_onemonth <- poltweets %>% 
+  filter(created_at >= "2018-05-01" & created_at < "2018-06-01")
+```
+
+As mentioned above, we should start by pre-processing the texts. Remember that in the previous subsection we removed strange characters from the text. Next we will create a tokenized version of `poltweets_onemonth`, where every row is a word contained in the original tweet, plus a column with the total number of times that each word is said in the entire dataset (we only keep words that are mentioned ten or more times). Right after doing that, we will we remove stopwords (conjuctions, articles, etc.) using the `stopwords` package. Notice that we will also employ a "custom" dictionary of stopwords, composed by the unique names and surnames of deputies.
+
+```{r}
+# obtain unique names and surnames of deputies
+names_surnames <- c(poltweets$names, poltweets$lastname) %>% 
+  na.omit() %>% 
+  unique() %>% 
+  str_to_lower() %>% 
+  f_remove_accent() %>% 
+  str_split(" ") %>% 
+  flatten_chr()
+
+poltweets_words <- poltweets_onemonth %>% 
+  unnest_tokens(word, text, "words") %>% 
+  # remove stop words:
+  filter(!word %in% stopwords::stopwords("es", "stopwords-iso")) %>% 
+  # remove names/surnames of deputies:
+  filter(!word %in% names_surnames) %>% 
+  # just keep words that are present ten or more times
+  add_count(word) %>% 
+  filter(n > 10)
+```
+
+That's it in term of pre-processing! Next we will transform the tokenized dataset into a stm object using the `cast_dfm()` and `convert()` functions. 
+
+```{r}
+poltweets_stm <- poltweets_words %>% 
+  cast_dfm(status_id, word, n) %>% 
+  convert(to = "stm")
+```
+
+In order to estimate the relation of the topics and the document covariates, we must add the covariate values into the `poltweets_stm$meta` object. The `metadata` object is a dataframe containing the metadata for every document in the stm object thatn can later be used as the document "prevalence"--or metadata. Notice that for creating the stm_meta object, it is necessary to join by the status_id variable, a column containing a unique identifier for every tweet.  
+
+```{r}
+metadata <- tibble(status_id = names(poltweets_stm$documents)) %>% 
+  left_join(distinct(poltweets, status_id, coalition, gender), 
+            by = "status_id") %>%
+  as.data.frame()
+
+poltweets_stm$meta <- metadata
+```
+
+Now we have all the necessary ingredients to estimate our structural topic model, stored in the `poltweets_stm` object:
+
+```{r include=F}
+options(max.print = 500)
+```
+
+```{r}
+summary(poltweets_stm)
+```
+
+```{r include=F}
+options(max.print = 8)
+```
+
+### Diagnostics
+
+To estimate a `stm`, one needs to define the number of topics ($K$) beforehand. However, there is no "right" number of topics, and the appropiate $K$ should be decided looking at the data itself [@robertsStmPackageStructural2019]. In order to do that, we should train several models and compute diagnostics that will help us decide. What range of $K$ should we consider? In the package manual [@R-stm], the authors offer the following advice: 
+
+> For short corpora focused on very specific subject matter (such as survey experiments) 3-10 topics is a useful starting range. For small corpora (a few hundred to a few thousand) 5-50 topics is a good place to start. Beyond these rough guidelinesit is application specific. Previous applications in political science with medium sized corpora (10kto 100k documents) have found 60-100 topics to work well. For larger corpora 100 topics is a useful default size. (p. 61)
+
+Our dataset has 5,647 documents, and therefore we will try 5-50 topics. We can use the `searchK()` function from the `stm` package to compute the relevant diagnostics, which we will store in the `stm_search` object. This process is computationally expensive, and might take several minutes on a modern computer. If you do not want to wait, you can load the object from the book's package (`data("stm_search")`) and keep going.
+
+```{r eval=F}
+stm_search <- searchK(documents = poltweets_stm$documents,
+                      vocab = poltweets_stm$vocab,
+                      data = poltweets_stm$meta,
+                      # our covariates, mentioned above:
+                      prevalence = ~ coalition + gender,
+                      # 5-50 topics range:
+                      K = seq(5, 50, by = 5), 
+                      # use all our available cores (be careful!):
+                      cores = parallel::detectCores(),
+                      # a seed to reproduce the analysis:
+                      heldout.seed = 123)
+```
+
+```{r message=F, echo=F}
+data("stm_search")
+```
+
+Next we will tidy our newly create object and plot its results using `ggplot2`:
+
+```{r}
+diagnostics <- stm_search$results %>% 
+  # get a tidy structure to plot:
+  mutate_all(flatten_dbl) %>% 
+  pivot_longer(-K, names_to = "diagnostic", values_to = "value") %>% 
+  # we will only use some diagnostics:
+  filter(diagnostic %in% c("exclus", "heldout", "residual", "semcoh")) %>% 
+  # give better names to the diagnostics:
+  mutate(diagnostic = case_when(
+    diagnostic == "exclus" ~ "Exclusivity",
+    diagnostic == "heldout" ~ "Held-out likelihood",
+    diagnostic == "residual" ~ "Residuals",
+    diagnostic == "semcoh" ~ "Semantic coherence"
+  ))
+```
+
+```{r}
+ggplot(diagnostics, aes(x = K, y = value)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~diagnostic, scales = "free")
+```
+
+Here we present four of the diagnostics obtained with `searchK()`. Both the held-out likelihood and the residuals (characteristics of the models, more information on @robertsStmPackageStructural2019) seem to suggest that increasing the topics is right approach. However, in our experience semantic coherence and exclusivity are the best indicators of $K$ appropriateness. Semantic coherence is perhaps the diagnostic that mostly correlates with human judgement of "topic quality" [@robertsStmPackageStructural2019], that is, topics that include terms that make thematic sense. However, @roberts_structural_2014 contend that semantic coherence can be easily achieved with few topics, and therefore should be considered jointly with "exclusivity", how distinctive the terms of the topic are compared to other topics. 
+
+Following these definitions and visually inspecting the plot above, models with K=10 and K=25 seem like good contenders. Let's estimate those separately (if you do not want to wait, you can again load the objects from our `politicalds` package):
+
+```{r eval=F}
+stm_model_k10 <- stm(documents = poltweets_stm$documents,
+                     vocab = poltweets_stm$vocab, 
+                     data = poltweets_stm$meta, 
+                     prevalence = ~ coalition + gender,
+                     K = 10)
+
+stm_model_k25 <- stm(documents = poltweets_stm$documents,
+                     vocab = poltweets_stm$vocab, 
+                     data = poltweets_stm$meta, 
+                     prevalence = ~ coalition + gender,
+                     K = 25)
+```
+
+```{r echo=F}
+data("stm_model_k10")
+data("stm_model_k25")
+```
+
+How should we decide between these two specifications? The exclusivity and semantic coherence presented in the previous plot are summary measures, so perhaps we can get more value by looking at specific values for each topic in the two models. In the following Figure \@ref(fig:stm-diag2) we plot semantic coherence against exclusivity, as suggested by @robertsStmPackageStructural2019. In the ideal world, we would like for all topics to be as semantically coherent and exclusive as possible. While we are not in that ideal world, it seems like the topics of the K=10 model are better in this sense, as the K=25 model has quite a few topics that position themselves as outliers, which either low semantic coherence or low exclusivity (or both!). Therefore, we will continue our analysis using the K=10 model.
+
+```{r}
+# obtain exclusivity and semantic coherence of topics within the models
+diagnostics2 <- tibble(
+  exclusivity = c(exclusivity(stm_model_k10), exclusivity(stm_model_k25)),
+  semantic_coherence = c(
+    semanticCoherence(stm_model_k10, documents = poltweets_stm$documents),
+    semanticCoherence(stm_model_k25, documents = poltweets_stm$documents)
+  ),
+  k = c(rep("K=10", 10), rep("K=25", 25))
+)
+```
+
+```{r stm-diag2, fig.cap="Semantic coherence and exclusivity of topics within the two models."}
+ggplot(data    = diagnostics2, 
+       mapping = aes(x = semantic_coherence, y = exclusivity, shape = k)) +
+  geom_point(size = 2) +
+  labs(x = "Semantic coherence", y = "Exclusivity", shape = "")
+```
+
+### Analysis
+
+We we have chosen a model with 10 topics. What does it look like? We can obtain the top terms of each topic (more on what this means in a second) and plot them, as shown in Figure \@ref(fig:stm-terms). The plot will also order the topics based on their expected proportion within the whole set of tweets. 
+
+```{r warning=F}
+model_terms <- tibble(
+  topic = as.character(1:10),
+  # obtain the top seven terms:
+  terms = labelTopics(stm_model_k10)$prob %>% 
+    t() %>% 
+    as_tibble() %>% 
+    map_chr(str_c, collapse = ", "),
+  # expected proportion of each topic in the whole set of tweets:
+  expected_proportion = colMeans(stm_model_k10$theta)
+) %>% 
+  arrange(-expected_proportion)
+
+```
+
+```{r stm-terms, fig.cap="Topics and their top terms.", fig.width=6}
+ggplot(data    = model_terms,
+       mapping = aes(x = expected_proportion, 
+                     y = fct_reorder(topic, expected_proportion),
+                     label = terms)) +
+  geom_col() +
+  geom_text(size = 3, hjust = "inward") + # to use space better
+  labs(x = "Expected proportion", y = "Topic")
+```
+
+Notice that Topic 2 is the one that reffers to gender, including the words "mujeres" (women), "derechos" (rights) and "género" (gender). We can use `labelTopics()` to obtain more terms that characterize this topic, as shown in the output below. "Highest Prob" terms are the same ones we used in the previous plot, the most common ones in the topic. Another interesting measure is "FREX", which picks terms that are distinctive of this topic, when compared to others (in this case, the words are the same). Lastly, "Lift" and "Score" are imported from other packages [@R-stm], and can also be useful when describing a topic. In this case, notice how "Lift" top terms include "olafeminista", one of the hashtags we discussed earlier.
+
+```{r eval=F}
+labelTopics(stm_model_k10, 
+            topics = 2) # this is the topic we want to analyze
+```
+
+```{r echo=F}
+f_labelTopics <- function (x, ...) 
+{
+  if (names(x)[1] != "topics") {
+    for (i in 1:length(x$topicnums)) {
+      toprint <- sprintf("Topic %i Top Words:\n\nHighest Prob:\n%s \nFREX:\n%s \nLift:\n%s \nScore:\n%s\n", 
+                         x$topicnums[i], 
+                         stm:::commas(x$prob[x$topicnums[i], 
+                         ]), 
+                         stm:::commas(x$frex[x$topicnums[i], ]), stm:::commas(x$lift[x$topicnums[i], 
+                         ]), 
+                         stm:::commas(x$score[x$topicnums[i], ]))
+      cat(toprint)
+    }
+  }
+}
+
+print(f_labelTopics(labelTopics(stm_model_k10, topics = 2)))
+```
+
+With this topic in mind, we can know analyze its relationship with metadata, in our case, the gender and coalition of deputies: are women and left-wing politicians more likely to tweet about the feminist wave? As we said before, the ability to estimate these topic--covariate relationships is a core advantage of structural topic models. The first step is to use `estimateEffect()` to obtain the model coefficients:
+
+```{r warning=F}
+stm_effects <- estimateEffect(
+  # c(1:10) means that we want coefficients for all topics in our model
+  formula  = c(1:10) ~ coalition + gender, 
+  stmobj   = stm_model_k10,
+  metadata = poltweets_stm$meta
+)
+```
+
+In the following we use the `tidystm` package^[`tidystm` needs to be installed from GitHub: `remotes::install_github("mikajoh/tidystm")`.] to extract model effects, via `extract.estimateEffect()`. Let us begin with gender. When the covariate of interest has two levels, the `method = "difference"` argument will obtain the change in topic prevalence shifting from one specific value to another.  In our case, the column "estimate" in the `effect_gender` object is the change in topic prevalence when comparing congresswomen to congressmen. There is a relatively large and positive estimate for Topic 2 (as expected), which is significant at the usual confidence levels. It should be noted that for the prevalence of other topics (4, 7, 10), gender seems to have an opposite (although smaller) effect, a finding that might be worth further investigation.
+
+```{r}
+library(tidystm)
+```
+
+```{r}
+effect_gender <- extract.estimateEffect(x = stm_effects,
+                                        covariate = "gender",
+                                        method = "difference",
+                                        cov.value1 = "Female",
+                                        cov.value2 = "Male",
+                                        model = stm_model_k10)
+effect_gender %>% arrange(-estimate)
+```
+
+It is possible to plot these results using `ggplot2`, a great advantage of the `tidystm` package, shown in Figure \@ref(fig:stm-effects):
+
+```{r stm-effects, fig.cap="Effect of gender on topic prevalence."}
+ggplot(effect_gender,
+       aes(x = estimate, xmin = ci.lower, xmax = ci.upper, 
+           y = fct_reorder(as.character(topic), estimate))) +
+  # add line of null effect:
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_point() +
+  geom_linerange() +
+  # center the null effect line:
+  scale_x_continuous(limits = c(-0.075, 0.075)) +
+  labs(x = "Estimate for the Female - Male difference", 
+       y = "Topic")
+```
+
+We can repeat the previous analysis for the other covariate in our model, obtaining the difference in topic prevalence between the most left-wing coalition (FA or Frente Amplio) and the most right-wing coalition (ChV or Chile Vamos). As expected, the model estimates that left-wing politicians were more likely to tweet about the feminist wave (Topic 2). 
+
+```{r}
+effect_coalition_diff <- extract.estimateEffect(x = stm_effects,
+                                                covariate = "coalition",
+                                                method = "difference",
+                                                cov.value1 = "FA",
+                                                cov.value2 = "ChV",
+                                                model = stm_model_k10)
+effect_coalition_diff %>% 
+  filter(topic == 2)
+```
+
+\index{exercise!13B-C. quantitative text analysis}
+
+> **Exercise 13B.** Plot the effects of the coalition covariate, showing the difference between the right-wing coalition (ChV) and the other others (FA and LFM). 
+>
+> **Exercise 13C.** Add the top 7 terms for each topic to Figure \@ref(fig:stm-effects). *Tip: you can use `left_join()` to merge the two datasets of interest.
+
+### Concluding remarks
+
+Political comunications in protest cycles have clear implications in the digital domain. In this section we have demonstrated that automated text analysis of political tweets captures variations in tweeting, particularly, how congresswomen appear more  correlated to certain topics, in this case the gender related topic 2.  STM is among the most recent NLP techniques used in political science for unsupervised text mining. Despite the clear benefist of using text mining, however, these techniques must be used with caution since topics interpretability is sensitive on many desicions like the K (number of topics for a given model) and text cleaning.   
