@@ -38,42 +38,20 @@ poltweets_hashtags <- poltweets_hashtags %>%
   mutate(fem_hashtag = as.character(fem_hashtag))
 
 
-#Let's make some bivariate analysis by grouping by the number of tweets per month, coalition and gender 
-
-library(lubridate)
-
-poltweets_hashtags %>% 
-  mutate(by_month = floor_date(as_date(created_at), 
-                               unit = "month", week_start = 1)) %>% 
-  ggplot(aes(x = by_month)) + 
-  geom_bar() + 
-  labs(title = "",
-       x = "Month", y = "Number of tweets") +
-  scale_x_date(breaks = scales::date_breaks("months"), 
-               labels = scales::date_format("%b %y")) + 
-  theme(axis.text.x = element_text(angle = 90))
-
-poltweets_hashtags %>% 
-  count(coalition) %>% 
-  ggplot(aes(x = fct_reorder(coalition, -n), y = n)) + 
-  geom_col() +
-  labs(title = "",
-       x = "Coalition", y = "Number of tweets")
-
-poltweets_hashtags %>%
-  count(gender) %>% 
-  ggplot(aes(x = fct_reorder(gender, -n), y = n)) + 
-  geom_col() +
-  labs(title = "",
-       x = "Gender", y = "Number of tweets") + 
-  theme(axis.text.x = element_text(angle = 90))
-
-
 ### Wordclouds by groups
 
 Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as #olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition Chile Vamos (ChV) uses no hashtag at all (see Figures \@ref(fig:qta6) and \@ref(fig:qta7)). 
 
 
+library(ggwordcloud)
+
+ggplot(data_hashtags_wordcloud, 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 8) + # we set a maximum size for the text 
+  theme_void()
+
+
 ggplot(poltweets_hashtags %>% 
          count(hashtag, gender, fem_hashtag) %>% 
          arrange(-n) %>% 
@@ -83,45 +61,12 @@ ggplot(poltweets_hashtags %>%
   geom_text_wordcloud() +
   scale_size_area(max_size = 6) + 
   facet_wrap(~gender)
+```
 
-ggplot(poltweets_hashtags %>% 
-         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
-                                  "#diputadohugorey",
-                                  hashtag)) %>% 
-         count(hashtag, gender, fem_hashtag) %>% 
-         arrange(-n) %>% 
-         group_by(gender) %>% 
-         slice(1:20), 
-       aes(label = hashtag, size = n, color = fem_hashtag)) + 
-  geom_text_wordcloud() +
-  scale_size_area(max_size = 6) +
-  scale_color_manual(values = c("darkgrey", "black")) +
-  facet_wrap(~gender)
 
-ggplot(poltweets_hashtags %>% 
-         count(hashtag, coalition, fem_hashtag) %>% 
-         arrange(-n) %>% 
-         group_by(coalition) %>% 
-         slice(1:20), 
-       aes(label = hashtag, size = n, color = fem_hashtag)) + 
-  geom_text_wordcloud() +
-  scale_size_area(max_size = 6) + 
-  facet_wrap(~coalition, nrow = 3)
 
-ggplot(poltweets_hashtags %>%
-         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
-                                  "#diputadohugorey",
-                                  hashtag)) %>% 
-         count(hashtag, coalition, fem_hashtag) %>% 
-         arrange(-n) %>% 
-         group_by(coalition) %>% 
-         slice(1:20), 
-       aes(label = hashtag, size = n, color = fem_hashtag)) + 
-  geom_text_wordcloud() +
-  scale_color_manual(values = c("darkgrey", "black")) +
-  scale_size_area(max_size = 6) + 
-  facet_wrap(~coalition, nrow = 3)
 
+```r
 
 ### Barplots
 
