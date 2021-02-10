@@ -3,8 +3,6 @@
 This readme file contains a brief description of an analysis I performed of Twitter data from Chilean deputies during the year 2018. 
 The full version of this analysis was published in a chapter of quantitative text analysis in the book [R for Political Data Science](https://www.taylorfrancis.com/chapters/quantitative-analysis-political-texts-sebasti%C3%A1n-huneeus/e/10.1201/9781003010623-13).
 
-I downloaded all the Tweets and then carried a series of descriptive analysis and topic models.  
-
 
 
 ## Part 1: Hashtag analysis 
@@ -13,7 +11,187 @@ In the study of contemporary social movements, hashtags like #metoo, #blacklives
 
 I was curious about how deputies related or resonated with the protests, so I downloaded all the tweets from May to June of 2018 of all the deputies with an active Twitter account. Then I kept all the tweets containing at least one hashtag. 
 
-For downloading the tweets I used the package 
+```r
+library(tidyverse)
+library(tidytext)
+library(politicalds)
+data("poltweets")
+
+
+#After we loaded the dataset and took a quick view to the size and variables included, we must extract the hashtags from the tweets using the `unnest_tokens()` #function of `tidytext`, creating a tokenized data frame with one row per hashtag. We then just filter all the rows starting with a hashtag (#), leaving us with a #one-hashtag-per-row data frame.
+
+poltweets_hashtags <- poltweets %>% 
+  unnest_tokens(output = "hashtag", input = "text", token = "tweets") %>%
+  filter(str_starts(hashtag, "#"))
+
+
+#We want to see the differences in how representatives, parties and coalitions engage in the gender political debate. To do so, we create a new dummy variable that #takes value "1" each time the character string variable matches any of the regular expresions like "femi", "niunamenos", "aborto", "mujer" and "genero":
+
+
+poltweets_hashtags <- poltweets_hashtags %>%
+  mutate(fem_hashtag = case_when(str_detect(hashtag, "femi") ~ 1, 
+                                 str_detect(hashtag, "niunamenos") ~ 1, 
+                                 str_detect(hashtag, "aborto") ~ 1,
+                                 str_detect(hashtag, "mujer") ~ 1,
+                                 str_detect(hashtag, "genero")~ 1,
+                                 TRUE ~ 0)) %>% 
+  mutate(fem_hashtag = as.character(fem_hashtag))
+
+
+#Let's make some bivariate analysis by grouping by the number of tweets per month, coalition and gender 
+
+library(lubridate)
+
+poltweets_hashtags %>% 
+  mutate(by_month = floor_date(as_date(created_at), 
+                               unit = "month", week_start = 1)) %>% 
+  ggplot(aes(x = by_month)) + 
+  geom_bar() + 
+  labs(title = "",
+       x = "Month", y = "Number of tweets") +
+  scale_x_date(breaks = scales::date_breaks("months"), 
+               labels = scales::date_format("%b %y")) + 
+  theme(axis.text.x = element_text(angle = 90))
+
+poltweets_hashtags %>% 
+  count(coalition) %>% 
+  ggplot(aes(x = fct_reorder(coalition, -n), y = n)) + 
+  geom_col() +
+  labs(title = "",
+       x = "Coalition", y = "Number of tweets")
+
+poltweets_hashtags %>%
+  count(gender) %>% 
+  ggplot(aes(x = fct_reorder(gender, -n), y = n)) + 
+  geom_col() +
+  labs(title = "",
+       x = "Gender", y = "Number of tweets") + 
+  theme(axis.text.x = element_text(angle = 90))
+
+
+### Wordclouds by groups
+
+Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as #olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition Chile Vamos (ChV) uses no hashtag at all (see Figures \@ref(fig:qta6) and \@ref(fig:qta7)). 
+
+
+ggplot(poltweets_hashtags %>% 
+         count(hashtag, gender, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(gender) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 6) + 
+  facet_wrap(~gender)
+
+ggplot(poltweets_hashtags %>% 
+         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                                  "#diputadohugorey",
+                                  hashtag)) %>% 
+         count(hashtag, gender, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(gender) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 6) +
+  scale_color_manual(values = c("darkgrey", "black")) +
+  facet_wrap(~gender)
+
+ggplot(poltweets_hashtags %>% 
+         count(hashtag, coalition, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(coalition) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 6) + 
+  facet_wrap(~coalition, nrow = 3)
+
+ggplot(poltweets_hashtags %>%
+         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                                  "#diputadohugorey",
+                                  hashtag)) %>% 
+         count(hashtag, coalition, fem_hashtag) %>% 
+         arrange(-n) %>% 
+         group_by(coalition) %>% 
+         slice(1:20), 
+       aes(label = hashtag, size = n, color = fem_hashtag)) + 
+  geom_text_wordcloud() +
+  scale_color_manual(values = c("darkgrey", "black")) +
+  scale_size_area(max_size = 6) + 
+  facet_wrap(~coalition, nrow = 3)
+
+
+### Barplots
+
+#Now we will rank the frequency of hashtags by gender. We will generate this graph in two steps, first we create a table with the 15 most used hashtags among women #and men. Then, we will create a bar chart by adding the `geom_col()` argument to the `ggplot()` function. As a result, we see the hashtag #aborto3causales #(#abortionunder3causes) and #leydeidentidaddegeneroahora (#genderidentitylawnow) appear only  congresswomen accounts, whereas none of these gender related #hashtags appear in masculine accounts.
+
+
+plot_15 <- poltweets_hashtags %>%
+  group_by(gender) %>% 
+  count(hashtag, fem_hashtag) %>% 
+  arrange(-n) %>% 
+  slice(1:15)
+
+ggplot(data    = plot_15,
+       mapping = aes(x = n, y = reorder_within(hashtag, n, gender), 
+                     fill = fem_hashtag)) +
+  geom_col()+
+  labs(x = "Frequency", y = "", fill = "Feminist hashtag") +
+  facet_wrap(~gender, scales = "free", nrow = 2) +
+  scale_y_reordered()
+
+ggplot(data    = plot_15,
+       mapping = aes(x = n, y = reorder_within(hashtag, n, gender), 
+                     fill = fem_hashtag)) +
+  geom_col()+
+  labs(x = "Frequency", y = "", fill = "Feminist hashtag") +
+  scale_fill_manual(values = c("darkgrey", "black")) +
+  facet_wrap(~gender, scales = "free", nrow = 2) +
+  scale_y_reordered()
+
+
+#Now we calculate and plot the statistic tf-idf, intended to measure how important a word is to a document in a collection of documents. This statistic is a #combination of term frequency (tf) and the term’s inverse document frequency (idf), which decreases the weight for commonly used words and increases the weight #for words that are not used very much in the entire collection of documents. We see that, when separating by groups, two hashtags with the highest statistic 
+#tf-idf in the Frente Amplio are gender related (#leydeidentidaddegeneroahora). 
+
+
+hash_tf_idf <- poltweets_hashtags %>%
+  # calculate tf-idf:
+  count(coalition, hashtag, fem_hashtag, sort = T) %>% 
+  bind_tf_idf(term = hashtag, document = coalition, n = n) %>% 
+  # get 10 most distinctive hashtags per coalition:
+  arrange(-tf_idf) %>% 
+  group_by(coalition) %>% 
+  slice(1:10)
+
+
+
+ggplot(data    = hash_tf_idf,
+       mapping = aes(x = tf_idf,
+                     y = reorder_within(hashtag, tf_idf, coalition), 
+                     fill = fem_hashtag)) +
+  geom_col() +
+  labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
+  facet_wrap(~coalition, nrow = 3, scales = "free") +
+  scale_y_reordered()
+
+
+
+ggplot(data    = hash_tf_idf %>% 
+         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
+                                  "#diputadohugorey",
+                                  hashtag)),
+       mapping = aes(x = tf_idf,
+                     y = reorder_within(hashtag, tf_idf, coalition), 
+                     fill = fem_hashtag)) +
+  geom_col() +
+  labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
+  scale_fill_manual(values = c("darkgrey", "black")) +
+  facet_wrap(~coalition, nrow = 3, scales = "free") +
+  scale_y_reordered()
+```
+
 
 
 
