@@ -132,7 +132,7 @@ ggplot(data    = hashtags_weekly,
 
 
 <p align="center">
-  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot3.jpg" width="500" title="hover text">
+  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot3.jpg" width="600" title="hover text">
 </p>
 
 
