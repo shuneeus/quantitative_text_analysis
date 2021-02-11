@@ -32,13 +32,13 @@ We want to see the differences in how representatives, parties and coalitions en
 
 ```r
 poltweets_hashtags <- poltweets_hashtags %>%
-  mutate(fem_hashtag = case_when(str_detect(hashtag, "femi") ~ 1, 
-                                 str_detect(hashtag, "niunamenos") ~ 1, 
-                                 str_detect(hashtag, "aborto") ~ 1,
-                                 str_detect(hashtag, "mujer") ~ 1,
-                                 str_detect(hashtag, "genero")~ 1,
-                                 TRUE ~ 0)) %>% 
-  mutate(fem_hashtag = as.character(fem_hashtag))
+                      mutate(fem_hashtag = case_when(str_detect(hashtag, "femi") ~ 1, 
+                                                     str_detect(hashtag, "niunamenos") ~ 1, 
+                                                     str_detect(hashtag, "aborto") ~ 1,
+                                                     str_detect(hashtag, "mujer") ~ 1,
+                                                     str_detect(hashtag, "genero")~ 1,
+                                                     TRUE ~ 0)) %>% 
+                      mutate(fem_hashtag = as.character(fem_hashtag))
 ```
 
 ### Wordclouds by groups
@@ -108,13 +108,13 @@ ggplot(data    = hash_tf_idf,
 
 ### Temporal variation in hashtag use
 
-Certain hashtags may increase or decrease in its use through time, depending on the political context. We will explore the weekly frequency of two most frequent hashtags in our example. Using the `lubridate` package, which works with data in a date format, we can look for time trends. In our dataset we have one variables with a date: `created_at`. Using this variable, we can confirm there was a peak in tweets between the 27th of May and the 2nd of June (see Figure \@ref(fig:qta9)). 
+Certain hashtags may increase or decrease in its use through time, depending on the political context. We will explore the weekly frequency of two most frequent hashtags in our example. Using the `lubridate` package, which works with data in a date format, we can look for time trends. In our dataset we have one variables with a date: `created_at`. Using this variable, we can confirm there was a peak in tweets between the 27th of May and the 2nd of June. 
 
 ```r
 hashtags_weekly <- poltweets_hashtags %>% 
                    mutate(week = floor_date(created_at, "week", week_start = 1)) %>% 
                    filter(hashtag %in% c("#aborto3causales", 
-                                          "#leydeidentidaddegeneroahora")) %>% 
+                                         "#leydeidentidaddegeneroahora")) %>% 
                    count(hashtag, week)
 
 ggplot(data    = hashtags_weekly,
@@ -152,10 +152,111 @@ In this section I show how to implement a NLP technique commonly used in politic
 Wordfish is an algorithm that allows one-dimensional scaling of a set of texts. That is, to order in a one-dimensional axis the documents from how similar they are to each other in the use of certain keywords. The classification is carried out by establishing the frequency of word use. This modeling assumes that the number of times a word is said in a document follows a Poisson distribution. This model is extremely simple since the number of times a word will appear is estimated from a single parameter λ, which is both the mean and the variance of the Poisson probability distribution.
 
 
+### Inspection and data cleaning 
+
+We load again the `poltweets` dataset and notice now that it contains a set of variables which are necessary for text analysis. Now we will use the entire tweets, not just the tokens. We will also require a variables `status_id` necessary to match each tweet to who tweeted it.  
+
 
 ```r
+library(quanteda) # dfm and corpus
+library(quanteda.textmodels) # wordfish
+library(qdapRegex) # remove non ascii characters
 
 ```
+### Preprocessing
+
+Before applying the algorithm, we must pre-process the texts. This means using regular expressions to make the text cleaner. We will use regular expressions to remove strange characters, usernames, URLs, emojis and switch everything to lowercase.
+
+```{r}
+
+#this function replaces "accents"
+f_remove_accent <- function(x){
+                               x %>% 
+                                    str_replace_all("á", "a") %>% 
+                                    str_replace_all("é", "e") %>% 
+                                    str_replace_all("í", "i") %>% 
+                                    str_replace_all("ó", "o") %>% 
+                                    str_replace_all("ú", "u") %>% 
+                                    str_replace_all("ñ", "n") # also replace "ñ", a common letter in Spanish
+ }
+
+
+poltweets <- poltweets %>% 
+              mutate(text = text %>%
+                       str_remove("\\@[[:alnum:]]+") %>% 
+                       str_remove_all("http[\\w[:punct:]]+") %>% 
+                       str_to_lower() %>%
+                       str_remove_all("[\\d\\.,_\\@]+") %>% 
+                       f_remove_accent() %>%
+                       rm_non_ascii())
+```
+
+Once the text is clean, we want to group it according to the variable for comparison. As we are interested in obtaining the estimates at the coalition level, we group the texts by coalition. Now each coalition is a document in the dataset. When ordering by coalitions, you should place the factor levels in a way that it resembles a left-right axis: 
+
+```{r}
+by_coalition <- poltweets %>% 
+                group_by(coalition) %>% 
+                summarize(text = str_c(text, collapse = " ")) %>%
+                ungroup() %>% 
+                mutate(coalition = fct_relevel(as.factor(coalition), "FA", "LFM", "ChV"))
+```
+
+For modeling with Quanteda we transform the dataset first to Corpus format, and then to Document-feature Matrix (DFM) format. This means transforming each documents in rows and "features" as columns. We make the transformation of the dataset grouped by coalitions to Corpus format and then to DFM. In addition, we take advantage of using a command that will help eliminate numbers, punctuations, symbols and stopwords (conjuctions, articles, etc.):
+
+```{r}
+poltweets_corpus <- corpus(by_coalition)
+
+poltweets_dfm <- dfm(poltweets_corpus,
+                     remove_numbers = T, remove_punct = T, 
+                     remove_symbols = T, remove = stopwords("spa"))
+```
+
+Using `dfm_trim()`, we eliminate words with frequency equal to or less than the 5th percentile and those words with a frequency equal or greater than the 95th percentile. In this way, we eliminate unusual words that are located at the extremes of the frequency distribution that can bias the results of the algorithm. 
+
+```{r}
+poltweets_dfm_trimmed <- dfm_trim(
+                              poltweets_dfm, 
+                              min_docfreq = 0.05, max_docfreq = 0.95, 
+                              docfreq_type = "quantile" # min 5% / max 95%)
+```
+
+### Wordfish
+
+
+We apply the Wordfish algorithm to the DFM class object, specific to Quanteda.We define the direction of parameter $\theta$ -the equivalent of $\beta$-, in this case that document 3 (FA) is the positive pole and document 1 (CHV) is the negative pole in the estimated ideological dimension. We also use the argument `sparse = T`, which allows working with large amounts of data, saving computational power.
+
+                               
+```{r}
+wf <- textmodel_wordfish(poltweets_dfm_trimmed,
+                         dir = c(3, 1), sparse = T)
+
+
+df_wf <- tibble(
+                coalition = wf[["x"]]@docvars[["coalition"]],
+                theta = wf$theta, 
+                lower = wf$theta - 1.96 * wf$se.theta, 
+                upper = wf$theta + 1.96 * wf$se.theta)
+
+
+
+ggplot(data    = df_wf,
+       mapping = aes(x = theta, y = fct_reorder(coalition, theta),
+                     xmin = lower, xmax = upper)) +
+      geom_point() +
+      geom_linerange() +
+      # add vertical line at x=0:
+      geom_vline(xintercept = 0, linetype = "dashed") +
+      scale_x_continuous(limits = c(-1.2, 1.2)) +
+      labs(y = "")
+
+```
+
+We see that coalitions are grouped along a left-right divide. The interest parameter $\theta$, equivalent to the beta parameter, is the parameter that discriminates the positions of the documents from the word frequencies. We see that this parameter is consistent with how coalitions are grouped politically. The rightmost one, Chile Vamos (ChV), with a $\theta$ of 1.07, is located at one end of the X axis, on the contrary, the leftmost one, Frente Amplio (FA), with a $\theta$ of -0.91, is located at the opposite end. 
+                    
+<p align="center">
+  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot4.jpg" width="500" title="hover text">
+</p>
+
 
 
 
@@ -168,5 +269,88 @@ Another useful development is the structural topic modeling (STM), a non supervi
 In this section, we will analize a subset of our tweets to find the most relevant topics and see how they correlate to the gender and coalition variables. Following [Julia Silge's lead](https://juliasilge.com/blog/evaluating-stm/), we will first do all the preprocessing using tidy tools, to then feed a corrected dataset to `stm`.
 
 
-```r
+### Pre-processing
+
+We will only employ tweets from May 2018:
+
+``` r 
+library(tidyverse)
+library(tidytext)
+library(stm)
+library(quanteda)
+library(qdapRegex)
+
+poltweets_onemonth <- poltweets %>% 
+                      filter(created_at >= "2018-05-01" & created_at < "2018-06-01")
+```
+
+As mentioned above, we should start by pre-processing the texts. Remember that in the previous subsection we removed strange characters from the text. Next we will create a tokenized version of `poltweets_onemonth`, where every row is a word contained in the original tweet, plus a column with the total number of times that each word is said in the entire dataset (we only keep words that are mentioned ten or more times). Right after doing that, we will we remove stopwords (conjuctions, articles, etc.) using the `stopwords` package. Notice that we will also employ a "custom" dictionary of stopwords, composed by the unique names and surnames of deputies.
+
+``` r 
+# obtain unique names and surnames of deputies
+names_surnames <- c(poltweets$names, poltweets$lastname) %>% 
+                    na.omit() %>% 
+                    unique() %>% 
+                    str_to_lower() %>% 
+                    f_remove_accent() %>% 
+                    str_split(" ") %>% 
+                    flatten_chr()
+
+poltweets_words <- poltweets_onemonth %>% 
+                    unnest_tokens(word, text, "words") %>% 
+                    # remove stop words:
+                    filter(!word %in% stopwords::stopwords("es", "stopwords-iso")) %>% 
+                    # remove names/surnames of deputies:
+                    filter(!word %in% names_surnames) %>% 
+                    # just keep words that are present ten or more times
+                    add_count(word) %>% 
+                    filter(n > 10)
+```
+
+That's it in term of pre-processing! Next we will transform the tokenized dataset into a stm object using the `cast_dfm()` and `convert()` functions. 
+
+``` r
+poltweets_stm <- poltweets_words %>% 
+                 cast_dfm(status_id, word, n) %>% 
+                 convert(to = "stm")
+```
+
+In order to estimate the relation of the topics and the document covariates, we must add the covariate values into the `poltweets_stm$meta` object. The `metadata` object is a dataframe containing the metadata for every document in the stm object thatn can later be used as the document "prevalence"--or metadata. Notice that for creating the stm_meta object, it is necessary to join by the status_id variable, a column containing a unique identifier for every tweet.  
+
+
+``` r
+metadata <- tibble(status_id = names(poltweets_stm$documents)) %>% 
+            left_join(distinct(poltweets, status_id, coalition, gender), by = "status_id") %>%
+            as.data.frame()     
+           
+poltweets_stm$meta <- metadata
+```
+
+Now we have all the necessary ingredients to estimate our structural topic model, stored in the `poltweets_stm` object:
+
+
+### Diagnostics
+
+To estimate a `stm`, one needs to define the number of topics ($K$) beforehand. However, there is no "right" number of topics, and the appropiate $K$ should be decided looking at the data itself [@robertsStmPackageStructural2019]. In order to do that, we should train several models and compute diagnostics that will help us decide. What range of $K$ should we consider? In the package manual [@R-stm], the authors offer the following advice: 
+
+> For short corpora focused on very specific subject matter (such as survey experiments) 3-10 topics is a useful starting range. For small corpora (a few hundred to a few thousand) 5-50 topics is a good place to start. Beyond these rough guidelinesit is application specific. Previous applications in political science with medium sized corpora (10kto 100k documents) have found 60-100 topics to work well. For larger corpora 100 topics is a useful default size. (p. 61)
+
+Our dataset has 5,647 documents, and therefore we will try 5-50 topics. We can use the `searchK()` function from the `stm` package to compute the relevant diagnostics, which we will store in the `stm_search` object. This process is computationally expensive, and might take several minutes on a modern computer. If you do not want to wait, you can load the object from the book's package (`data("stm_search")`) and keep going.
+
+
+``` r
+stm_search <- searchK(documents = poltweets_stm$documents,
+                      vocab = poltweets_stm$vocab,
+                      data = poltweets_stm$meta,
+                      # our covariates, mentioned above:
+                      prevalence = ~ coalition + gender,
+                      # 5-50 topics range:
+                      K = seq(5, 50, by = 5), 
+                      # use all our available cores (be careful!):
+                      cores = parallel::detectCores(),
+                      # a seed to reproduce the analysis:
+                      heldout.seed = 123)
+```
+
+
 ```
