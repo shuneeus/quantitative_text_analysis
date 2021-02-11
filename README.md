@@ -3,6 +3,11 @@
 This readme file contains a brief description of an analysis I performed of Twitter data from Chilean deputies during the year 2018. 
 The full version of this analysis was published in a chapter of quantitative text analysis in the book [R for Political Data Science](https://www.taylorfrancis.com/chapters/quantitative-analysis-political-texts-sebasti%C3%A1n-huneeus/e/10.1201/9781003010623-13). 
 
+<p align="center">
+  <img src="https://images.tandf.co.uk/common/jackets/agentjpg/978100301/9781003010623.jpg" width="350" title="hover text">
+</p>
+
+
 The original chapter is divided into three sections, which employ different strategies to analyze textual data from Twitter.
 In this example, I will cover text analysis exploration and Wordfish (an NLP technique to position texts along an axis). 
 
