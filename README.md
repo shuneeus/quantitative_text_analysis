@@ -11,6 +11,7 @@ In the study of contemporary social movements, hashtags like #metoo, #blacklives
 
 I was curious about how deputies related or resonated with the protests, so I downloaded all the tweets from May to June of 2018 of all the deputies with an active Twitter account. Then I kept all the tweets containing at least one hashtag. 
 
+
 ```r
 library(tidyverse)
 library(tidytext)
@@ -40,8 +41,7 @@ poltweets_hashtags <- poltweets_hashtags %>%
 
 ### Wordclouds by groups
 
-Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as #olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition Chile Vamos (ChV) uses no hashtag at all (see Figures \@ref(fig:qta6) and \@ref(fig:qta7)). 
-
+#Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as #olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When #faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition #Chile Vamos (ChV) uses no hashtag at all (see Figures \@ref(fig:qta6) and \@ref(fig:qta7)). 
 
 library(ggwordcloud)
 
@@ -63,38 +63,13 @@ ggplot(poltweets_hashtags %>%
   facet_wrap(~gender)
 ```
 
-
+<p align="center">
+  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot1.jpg" width="500" title="hover text">
+</p>
 
 
 ```r
-
 ### Barplots
-
-#Now we will rank the frequency of hashtags by gender. We will generate this graph in two steps, first we create a table with the 15 most used hashtags among women #and men. Then, we will create a bar chart by adding the `geom_col()` argument to the `ggplot()` function. As a result, we see the hashtag #aborto3causales #(#abortionunder3causes) and #leydeidentidaddegeneroahora (#genderidentitylawnow) appear only  congresswomen accounts, whereas none of these gender related #hashtags appear in masculine accounts.
-
-
-plot_15 <- poltweets_hashtags %>%
-  group_by(gender) %>% 
-  count(hashtag, fem_hashtag) %>% 
-  arrange(-n) %>% 
-  slice(1:15)
-
-ggplot(data    = plot_15,
-       mapping = aes(x = n, y = reorder_within(hashtag, n, gender), 
-                     fill = fem_hashtag)) +
-  geom_col()+
-  labs(x = "Frequency", y = "", fill = "Feminist hashtag") +
-  facet_wrap(~gender, scales = "free", nrow = 2) +
-  scale_y_reordered()
-
-ggplot(data    = plot_15,
-       mapping = aes(x = n, y = reorder_within(hashtag, n, gender), 
-                     fill = fem_hashtag)) +
-  geom_col()+
-  labs(x = "Frequency", y = "", fill = "Feminist hashtag") +
-  scale_fill_manual(values = c("darkgrey", "black")) +
-  facet_wrap(~gender, scales = "free", nrow = 2) +
-  scale_y_reordered()
 
 
 #Now we calculate and plot the statistic tf-idf, intended to measure how important a word is to a document in a collection of documents. This statistic is a #combination of term frequency (tf) and the term’s inverse document frequency (idf), which decreases the weight for commonly used words and increases the weight #for words that are not used very much in the entire collection of documents. We see that, when separating by groups, two hashtags with the highest statistic 
@@ -121,31 +96,26 @@ ggplot(data    = hash_tf_idf,
   facet_wrap(~coalition, nrow = 3, scales = "free") +
   scale_y_reordered()
 
-
-
-ggplot(data    = hash_tf_idf %>% 
-         mutate(hashtag = if_else(hashtag == "#diputadohugorey👑",
-                                  "#diputadohugorey",
-                                  hashtag)),
-       mapping = aes(x = tf_idf,
-                     y = reorder_within(hashtag, tf_idf, coalition), 
-                     fill = fem_hashtag)) +
-  geom_col() +
-  labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
-  scale_fill_manual(values = c("darkgrey", "black")) +
-  facet_wrap(~coalition, nrow = 3, scales = "free") +
-  scale_y_reordered()
 ```
 
 
+<p align="center">
+  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot2.jpg" width="500" title="hover text">
+</p>
 
 
+
+```r
 ## Part 2: Wordfish  
 
 In this section I show how to implement a NLP technique commonly used in political science for unsupervised text mining: Wordfish. This text processing models allow us to summarize a lot of different documents in a fast and economical way and can complement other descriptive measures like word and hashtags frequencies. As an unsupervised technique, the classifications will is done without using any previous coding or dictionary. This has the advantage of saving work on manual coding, as well as avoiding the coder's own bias. Another advantage is that is not dependent on the source language, i.e. in principle they can be used in any language. This method use the "bag of words" approach, since the order of the words within a text does not alter the analysis. The parameters estimated by the algorithm can then be plotted with `ggplot2`, which facilitates the visual interpretation of the results. 
 
 Wordfish is an algorithm that allows one-dimensional scaling of a set of texts. That is, to order in a one-dimensional axis the documents from how similar they are to each other in the use of certain keywords. The classification is carried out by establishing the frequency of word use. This modeling assumes that the number of times a word is said in a document follows a Poisson distribution. This model is extremely simple since the number of times a word will appear is estimated from a single parameter λ, which is both the mean and the variance of the Poisson probability distribution.
 
+```
+
+
+```r
 
 ## Part 3: Structural Topic Models 
 
@@ -154,3 +124,5 @@ Topic modeling is a computational method for automatically identifying relevant 
 Another useful development is the structural topic modeling (STM), a non supervised NLP technique for diving large corpora of texts. The main innovation of the STM is that it incorporates metadata into the topic model, so it allows researchers to discover topics and estimate their relationship to covariates, improving the quality of the inferences and the interpretability of the results. The STM algorithm is available in the `stm` package created by Molly Roberts, Brandon Stewart and Dustin Tingley. For a more detailed review of this method there is a bulk of material in the [official site of the package](http://www.structuraltopicmodel.com/).
 
 In this section, we will analize a subset of our tweets to find the most relevant topics and see how they correlate to the gender and coalition variables. Following [Julia Silge's lead](https://juliasilge.com/blog/evaluating-stm/), we will first do all the preprocessing using tidy tools, to then feed a corrected dataset to `stm`.
+
+```
