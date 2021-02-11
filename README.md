@@ -227,7 +227,7 @@ poltweets_dfm_trimmed <- dfm_trim(
 ### Wordfish
 
 
-We apply the Wordfish algorithm to the DFM class object, specific to Quanteda.We define the direction of parameter $\theta$ -the equivalent of $\beta$-, in this case that document 3 (FA) is the positive pole and document 1 (CHV) is the negative pole in the estimated ideological dimension. We also use the argument `sparse = T`, which allows working with large amounts of data, saving computational power.
+We apply the Wordfish algorithm to the DFM class object, specific to Quanteda.We define the direction of parameter θ -the equivalent of β, in this case that document 3 (FA) is the positive pole and document 1 (CHV) is the negative pole in the estimated ideological dimension. We also use the argument `sparse = T`, which allows working with large amounts of data, saving computational power.
 
                                
 ```{r}
@@ -255,8 +255,8 @@ ggplot(data    = df_wf,
 
 ```
 
-We see that coalitions are grouped along a left-right divide. The interest parameter $\theta$, equivalent to the beta parameter, is the parameter that discriminates the positions of the documents from the word frequencies. We see that this parameter is consistent with how coalitions are grouped politically. The rightmost one, Chile Vamos (ChV), with a $\theta$ of 1.07, is located at one end of the X axis, on the contrary, the leftmost one, Frente Amplio (FA), with a $\theta$ of -0.91, is located at the opposite end. 
+We see that coalitions are grouped along a left-right divide. The interest parameter θ, equivalent to the β parameter, is the parameter that discriminates the positions of the documents from the word frequencies. We see that this parameter is consistent with how coalitions are grouped politically. The rightmost one, Chile Vamos (ChV), with a θ of 1.07, is located at one end of the X axis, on the contrary, the leftmost one, Frente Amplio (FA), with a θ of -0.91, is located at the opposite end. 
                     
 <p align="center">
-  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot4.jpg" width="500" title="hover text">
+  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot4.jpg" width="600" title="hover text">
 </p>
