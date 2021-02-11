@@ -23,8 +23,8 @@ After we loaded the dataset and took a quick view to the size and variables incl
 
 ```r
 poltweets_hashtags <- poltweets %>% 
-  unnest_tokens(output = "hashtag", input = "text", token = "tweets") %>%
-  filter(str_starts(hashtag, "#"))
+                      unnest_tokens(output = "hashtag", input = "text", token = "tweets") %>%
+                      filter(str_starts(hashtag, "#"))
 ```
 
 
@@ -50,20 +50,20 @@ library(ggwordcloud)
 
 ggplot(data_hashtags_wordcloud, 
        aes(label = hashtag, size = n, color = fem_hashtag)) + 
-  geom_text_wordcloud() +
-  scale_size_area(max_size = 8) + # we set a maximum size for the text 
-  theme_void()
+       geom_text_wordcloud() +
+       scale_size_area(max_size = 8) + # we set a maximum size for the text 
+       theme_void()
 
 
 ggplot(poltweets_hashtags %>% 
-         count(hashtag, gender, fem_hashtag) %>% 
-         arrange(-n) %>% 
-         group_by(gender) %>% 
-         slice(1:20), 
+       count(hashtag, gender, fem_hashtag) %>% 
+       arrange(-n) %>% 
+       group_by(gender) %>% 
+       slice(1:20), 
        aes(label = hashtag, size = n, color = fem_hashtag)) + 
-  geom_text_wordcloud() +
-  scale_size_area(max_size = 6) + 
-  facet_wrap(~gender)
+       geom_text_wordcloud() +
+       scale_size_area(max_size = 6) + 
+       facet_wrap(~gender)
 ```
 
 <p align="center">
@@ -80,25 +80,22 @@ tf-idf in the Frente Amplio are gender related (#leydeidentidaddegeneroahora).
 
 ```r
 
-hash_tf_idf <- poltweets_hashtags %>%
-  # calculate tf-idf:
-  count(coalition, hashtag, fem_hashtag, sort = T) %>% 
-  bind_tf_idf(term = hashtag, document = coalition, n = n) %>% 
-  # get 10 most distinctive hashtags per coalition:
-  arrange(-tf_idf) %>% 
-  group_by(coalition) %>% 
-  slice(1:10)
-
+hash_tf_idf <- poltweets_hashtags %>%   # calculate tf-idf:
+               count(coalition, hashtag, fem_hashtag, sort = T) %>% 
+               bind_tf_idf(term = hashtag, document = coalition, n = n) %>% 
+               arrange(-tf_idf) %>% 
+               group_by(coalition) %>% 
+               slice(1:10)
 
 
 ggplot(data    = hash_tf_idf,
        mapping = aes(x = tf_idf,
                      y = reorder_within(hashtag, tf_idf, coalition), 
                      fill = fem_hashtag)) +
-  geom_col() +
-  labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
-  facet_wrap(~coalition, nrow = 3, scales = "free") +
-  scale_y_reordered()
+       geom_col() +
+       labs(x = "tf_idf", y = "", fill = "Feminist Hashtag") +
+       facet_wrap(~coalition, nrow = 3, scales = "free") +
+       scale_y_reordered()
 
 ```
 
