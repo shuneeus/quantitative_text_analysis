@@ -109,6 +109,41 @@ ggplot(data    = hash_tf_idf,
 
 
 
+### Temporal variation in hashtag use
+
+Certain hashtags may increase or decrease in its use through time, depending on the political context. We will explore the weekly frequency of two most frequent hashtags in our example. Using the `lubridate` package, which works with data in a date format, we can look for time trends. In our dataset we have one variables with a date: `created_at`. Using this variable, we can confirm there was a peak in tweets between the 27th of May and the 2nd of June (see Figure \@ref(fig:qta9)). 
+
+```r
+hashtags_weekly <- poltweets_hashtags %>% 
+                   mutate(week = floor_date(created_at, "week", week_start = 1)) %>% 
+                   filter(hashtag %in% c("#aborto3causales", 
+                                          "#leydeidentidaddegeneroahora")) %>% 
+                   count(hashtag, week)
+
+ggplot(data    = hashtags_weekly,
+       mapping = aes(x = week, y = n, 
+       linetype = hashtag, group = hashtag)) +
+       geom_point() +
+       geom_line() +
+       labs(x = "Week", y = "Total weekly use", linetype = "Hashtag")
+
+```
+
+
+<p align="center">
+  <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot3.jpg" width="500" title="hover text">
+</p>
+
+
+
+
+### To sum up
+
+Hashtags can tell you a lot about a political debate. We could verify some evident differences in the use of gender "#". Congresswomen used far more hashtags such as #olafeminista (#feministwave) and #agendamujer (#womenagenda) than their male counterparts. Regarding the coalitions, the left-wing ones (Frente Amplio and La Fuerza de la Mayoría) used them more. Regarding the temporal variation, the greater intensity of mentions on gender issues occurred during the week of the 14-20th of May, the week before the Public Account Speech (21st of May), which also fitted with a manifestation in various cities of the country. We observe that, in relative terms, congresswomen were almost five times more interested in the feminist movement, since they used the hashtag #agendamujer 5 times more than their male counterparts during the week of the 14-20th of May.
+
+What did you learn in this section? We showed you how to use Twitter to analyzing political phenomena. Once you have your own dataset you can follow our step by step analysis. This would be useful as your starting point for explanatory designs that inquire on the causes of political alignment in different agendas.
+
+
 
 
 ## Part 2: Natural Language Processing
