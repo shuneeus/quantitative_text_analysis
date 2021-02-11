@@ -1,7 +1,11 @@
 # Twitter Analysis
 
 This readme file contains a brief description of an analysis I performed of Twitter data from Chilean deputies during the year 2018. 
-The full version of this analysis was published in a chapter of quantitative text analysis in the book [R for Political Data Science](https://www.taylorfrancis.com/chapters/quantitative-analysis-political-texts-sebasti%C3%A1n-huneeus/e/10.1201/9781003010623-13).
+The full version of this analysis was published in a chapter of quantitative text analysis in the book [R for Political Data Science](https://www.taylorfrancis.com/chapters/quantitative-analysis-political-texts-sebasti%C3%A1n-huneeus/e/10.1201/9781003010623-13). 
+
+The original chapter is divided into three sections, which employ different strategies to analyze textual data from Twitter.
+In this example, I will cover text analysis exploration and Wordfish (an NLP technique to position texts along an axis). 
+
 
 
 
@@ -256,101 +260,3 @@ We see that coalitions are grouped along a left-right divide. The interest param
 <p align="center">
   <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot4.jpg" width="500" title="hover text">
 </p>
-
-
-
-
-### Structural Topic Model algorithm
-
-Topic modeling is a computational method for automatically identifying relevant word groupings in large volumes of texts. One of the most popular applications in political science is the Latent Dirichlet Allocation (LDA), developed by David Blei and explained in a didactic way at the [Machine Learning Summer School 2009 at Cambridge University](https://www.youtube.com/watch?v=DDq3OVp9dNA).  
-
-Another useful development is the structural topic modeling (STM), a non supervised NLP technique for diving large corpora of texts. The main innovation of the STM is that it incorporates metadata into the topic model, so it allows researchers to discover topics and estimate their relationship to covariates, improving the quality of the inferences and the interpretability of the results. The STM algorithm is available in the `stm` package created by Molly Roberts, Brandon Stewart and Dustin Tingley. For a more detailed review of this method there is a bulk of material in the [official site of the package](http://www.structuraltopicmodel.com/).
-
-In this section, we will analize a subset of our tweets to find the most relevant topics and see how they correlate to the gender and coalition variables. Following [Julia Silge's lead](https://juliasilge.com/blog/evaluating-stm/), we will first do all the preprocessing using tidy tools, to then feed a corrected dataset to `stm`.
-
-
-### Pre-processing
-
-We will only employ tweets from May 2018:
-
-``` r 
-library(tidyverse)
-library(tidytext)
-library(stm)
-library(quanteda)
-library(qdapRegex)
-
-poltweets_onemonth <- poltweets %>% 
-                      filter(created_at >= "2018-05-01" & created_at < "2018-06-01")
-```
-
-As mentioned above, we should start by pre-processing the texts. Remember that in the previous subsection we removed strange characters from the text. Next we will create a tokenized version of `poltweets_onemonth`, where every row is a word contained in the original tweet, plus a column with the total number of times that each word is said in the entire dataset (we only keep words that are mentioned ten or more times). Right after doing that, we will we remove stopwords (conjuctions, articles, etc.) using the `stopwords` package. Notice that we will also employ a "custom" dictionary of stopwords, composed by the unique names and surnames of deputies.
-
-``` r 
-# obtain unique names and surnames of deputies
-names_surnames <- c(poltweets$names, poltweets$lastname) %>% 
-                    na.omit() %>% 
-                    unique() %>% 
-                    str_to_lower() %>% 
-                    f_remove_accent() %>% 
-                    str_split(" ") %>% 
-                    flatten_chr()
-
-poltweets_words <- poltweets_onemonth %>% 
-                    unnest_tokens(word, text, "words") %>% 
-                    # remove stop words:
-                    filter(!word %in% stopwords::stopwords("es", "stopwords-iso")) %>% 
-                    # remove names/surnames of deputies:
-                    filter(!word %in% names_surnames) %>% 
-                    # just keep words that are present ten or more times
-                    add_count(word) %>% 
-                    filter(n > 10)
-```
-
-That's it in term of pre-processing! Next we will transform the tokenized dataset into a stm object using the `cast_dfm()` and `convert()` functions. 
-
-``` r
-poltweets_stm <- poltweets_words %>% 
-                 cast_dfm(status_id, word, n) %>% 
-                 convert(to = "stm")
-```
-
-In order to estimate the relation of the topics and the document covariates, we must add the covariate values into the `poltweets_stm$meta` object. The `metadata` object is a dataframe containing the metadata for every document in the stm object thatn can later be used as the document "prevalence"--or metadata. Notice that for creating the stm_meta object, it is necessary to join by the status_id variable, a column containing a unique identifier for every tweet.  
-
-
-``` r
-metadata <- tibble(status_id = names(poltweets_stm$documents)) %>% 
-            left_join(distinct(poltweets, status_id, coalition, gender), by = "status_id") %>%
-            as.data.frame()     
-           
-poltweets_stm$meta <- metadata
-```
-
-Now we have all the necessary ingredients to estimate our structural topic model, stored in the `poltweets_stm` object:
-
-
-### Diagnostics
-
-To estimate a `stm`, one needs to define the number of topics ($K$) beforehand. However, there is no "right" number of topics, and the appropiate $K$ should be decided looking at the data itself [@robertsStmPackageStructural2019]. In order to do that, we should train several models and compute diagnostics that will help us decide. What range of $K$ should we consider? In the package manual [@R-stm], the authors offer the following advice: 
-
-> For short corpora focused on very specific subject matter (such as survey experiments) 3-10 topics is a useful starting range. For small corpora (a few hundred to a few thousand) 5-50 topics is a good place to start. Beyond these rough guidelinesit is application specific. Previous applications in political science with medium sized corpora (10kto 100k documents) have found 60-100 topics to work well. For larger corpora 100 topics is a useful default size. (p. 61)
-
-Our dataset has 5,647 documents, and therefore we will try 5-50 topics. We can use the `searchK()` function from the `stm` package to compute the relevant diagnostics, which we will store in the `stm_search` object. This process is computationally expensive, and might take several minutes on a modern computer. If you do not want to wait, you can load the object from the book's package (`data("stm_search")`) and keep going.
-
-
-``` r
-stm_search <- searchK(documents = poltweets_stm$documents,
-                      vocab = poltweets_stm$vocab,
-                      data = poltweets_stm$meta,
-                      # our covariates, mentioned above:
-                      prevalence = ~ coalition + gender,
-                      # 5-50 topics range:
-                      K = seq(5, 50, by = 5), 
-                      # use all our available cores (be careful!):
-                      cores = parallel::detectCores(),
-                      # a seed to reproduce the analysis:
-                      heldout.seed = 123)
-```
-
-
-```
