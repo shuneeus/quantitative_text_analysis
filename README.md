@@ -17,18 +17,20 @@ library(tidyverse)
 library(tidytext)
 library(politicalds)
 data("poltweets")
+```
 
+After we loaded the dataset and took a quick view to the size and variables included, we must extract the hashtags from the tweets using the `unnest_tokens()` function of `tidytext`, creating a tokenized data frame with one row per hashtag. We then just filter all the rows starting with a hashtag (#), leaving us with a one-hashtag-per-row data frame.
 
-#After we loaded the dataset and took a quick view to the size and variables included, we must extract the hashtags from the tweets using the `unnest_tokens()` #function of `tidytext`, creating a tokenized data frame with one row per hashtag. We then just filter all the rows starting with a hashtag (#), leaving us with a #one-hashtag-per-row data frame.
-
+```r
 poltweets_hashtags <- poltweets %>% 
   unnest_tokens(output = "hashtag", input = "text", token = "tweets") %>%
   filter(str_starts(hashtag, "#"))
+```
 
 
-#We want to see the differences in how representatives, parties and coalitions engage in the gender political debate. To do so, we create a new dummy variable that #takes value "1" each time the character string variable matches any of the regular expresions like "femi", "niunamenos", "aborto", "mujer" and "genero":
+We want to see the differences in how representatives, parties and coalitions engage in the gender political debate. To do so, we create a new dummy variable that takes value "1" each time the character string variable matches any of the regular expresions like "femi", "niunamenos", "aborto", "mujer" and "genero":
 
-
+```r
 poltweets_hashtags <- poltweets_hashtags %>%
   mutate(fem_hashtag = case_when(str_detect(hashtag, "femi") ~ 1, 
                                  str_detect(hashtag, "niunamenos") ~ 1, 
@@ -37,12 +39,13 @@ poltweets_hashtags <- poltweets_hashtags %>%
                                  str_detect(hashtag, "genero")~ 1,
                                  TRUE ~ 0)) %>% 
   mutate(fem_hashtag = as.character(fem_hashtag))
-
+```
 
 ### Wordclouds by groups
 
-#Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as #olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When #faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition #Chile Vamos (ChV) uses no hashtag at all (see Figures \@ref(fig:qta6) and \@ref(fig:qta7)). 
+Using the `facet_wrap()` function, wordclouds can be split by variables of interest. Classifiying by gender and coalition, we immediately see how hashtags such as olafeminista (#feministwave), #agendamujer (#womenagenda) and #educacionnosexista (#sexisteducation) appear only among congresswomen Twitter accounts. When faceting by coalitions, we realize that the tweets from the Frente Amplio (FA) use a high proportion of gender related hashtags, whereas the oficialist coalition Chile Vamos (ChV) uses no hashtag at all. 
 
+```r
 library(ggwordcloud)
 
 ggplot(data_hashtags_wordcloud, 
