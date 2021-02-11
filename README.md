@@ -71,13 +71,14 @@ ggplot(poltweets_hashtags %>%
 </p>
 
 
-```r
+
 ### Barplots
 
 
-#Now we calculate and plot the statistic tf-idf, intended to measure how important a word is to a document in a collection of documents. This statistic is a #combination of term frequency (tf) and the term’s inverse document frequency (idf), which decreases the weight for commonly used words and increases the weight #for words that are not used very much in the entire collection of documents. We see that, when separating by groups, two hashtags with the highest statistic 
-#tf-idf in the Frente Amplio are gender related (#leydeidentidaddegeneroahora). 
+Now we calculate and plot the statistic tf-idf, intended to measure how important a word is to a document in a collection of documents. This statistic is a combination of term frequency (tf) and the term’s inverse document frequency (idf), which decreases the weight for commonly used words and increases the weight for words that are not used very much in the entire collection of documents. We see that, when separating by groups, two hashtags with the highest statistic 
+tf-idf in the Frente Amplio are gender related (#leydeidentidaddegeneroahora). 
 
+```r
 
 hash_tf_idf <- poltweets_hashtags %>%
   # calculate tf-idf:
@@ -105,6 +106,9 @@ ggplot(data    = hash_tf_idf,
 <p align="center">
   <img src="https://github.com/shuneeus/text_mining/blob/master/Images/plot2.jpg" width="500" title="hover text">
 </p>
+
+
+
 
 
 ## Part 2: Natural Language Processing
